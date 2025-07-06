@@ -1,0 +1,10 @@
+{
+    "customer_name": "sai",
+    "bill_to": "244",
+    "bills": [
+        {
+            "amount": 100,
+            "timestamp": "2025-07-06T08:08:38.716574"
+        }
+    ]
+}
