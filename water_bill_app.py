@@ -8,12 +8,10 @@ from pathlib import Path
 DATA_DIR = "data/bills"
 Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
 
-
 # ---------------- Helper Functions ----------------
 
 def get_file_path(phone):
     return os.path.join(DATA_DIR, f"{phone}.json")
-
 
 def load_bill(phone):
     path = get_file_path(phone)
@@ -22,7 +20,6 @@ def load_bill(phone):
             return json.load(f)
     return None
 
-
 def save_bill(phone, customer_name, bill_to, new_bill):
     path = get_file_path(phone)
     data = load_bill(phone)
@@ -30,16 +27,7 @@ def save_bill(phone, customer_name, bill_to, new_bill):
     if data:
         data["customer_name"] = customer_name
         data["bill_to"] = bill_to
-
-        # Update existing bill if month/year match
-        updated = False
-        for idx, bill in enumerate(data["bills"]):
-            if bill["month"] == new_bill["month"] and bill["year"] == new_bill["year"]:
-                data["bills"][idx] = new_bill
-                updated = True
-                break
-        if not updated:
-            data["bills"].append(new_bill)
+        data["bills"].append(new_bill)
     else:
         data = {
             "customer_name": customer_name,
@@ -50,7 +38,6 @@ def save_bill(phone, customer_name, bill_to, new_bill):
     with open(path, "w") as f:
         json.dump(data, f, indent=4)
 
-
 def list_all_bills_for_month(month, year):
     results = []
     for file in os.listdir(DATA_DIR):
@@ -59,17 +46,16 @@ def list_all_bills_for_month(month, year):
             with open(path, "r") as f:
                 data = json.load(f)
                 for bill in data.get("bills", []):
-                    if bill["month"] == month and bill["year"] == year:
+                    ts = datetime.fromisoformat(bill["timestamp"])
+                    if ts.month == month and ts.year == year:
                         results.append({
                             "phone": file.replace(".json", ""),
                             "name": data["customer_name"],
                             "bill_to": data["bill_to"],
-                            "units": bill["units"],
                             "amount": bill["amount"],
                             "timestamp": bill["timestamp"]
                         })
     return results
-
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Water Bill App", layout="centered")
@@ -81,37 +67,14 @@ mode = st.sidebar.radio("Select Mode", ["➕ Add or Edit Bill", "🔍 Search by 
 if mode == "➕ Add or Edit Bill":
     st.header("➕ Add or Edit Water Bill")
 
-    phone = st.text_input("Phone Number (Primary Key)", max_chars=15)
+    phone = st.text_input("Phone Number*", max_chars=10)
     customer_name = st.text_input("Customer Name")
     bill_to = st.text_input("Bill To (Address)")
-    month = st.selectbox("Month", [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ])
-    year = st.selectbox("Year", list(range(2020, datetime.now().year + 1))[::-1])
-
-    existing_units = 0.0
-    existing_amount = 0.0
-
-    # Pre-fill existing bill if found
-    existing_data = load_bill(phone)
-    if existing_data:
-        for bill in existing_data.get("bills", []):
-            if bill["month"] == month and bill["year"] == year:
-                existing_units = bill["units"]
-                existing_amount = bill["amount"]
-                st.info(f"Editing existing bill for {month} {year}")
-                break
-
-    units = st.number_input("Units Consumed", min_value=0.0, value=existing_units)
-    amount = st.number_input("Amount Paid (₹)", min_value=0.0, value=existing_amount)
+    amount = st.number_input("Amount Paid (₹)", min_value=0.0)
 
     if st.button("💾 Save Bill"):
         if phone and customer_name and bill_to:
             bill = {
-                "month": month,
-                "year": year,
-                "units": units,
                 "amount": amount,
                 "timestamp": datetime.now().isoformat()
             }
@@ -131,10 +94,10 @@ elif mode == "🔍 Search by Phone":
             st.write(f"📍 Address: {data['bill_to']}")
             st.write("📜 Bill History:")
             for bill in sorted(data["bills"], key=lambda x: x["timestamp"], reverse=True):
+                dt = datetime.fromisoformat(bill["timestamp"])
                 st.markdown(f"""
-                - **Month/Year:** {bill["month"]} {bill["year"]}
-                - **Units:** {bill["units"]}  
-                - **Amount:** ₹{bill["amount"]}  
+                - **Date:** {dt.strftime("%d %B %Y")}
+                - **Amount:** ₹{bill["amount"]}
                 - ⏱️ {bill["timestamp"]}
                 """)
         else:
@@ -143,16 +106,14 @@ elif mode == "🔍 Search by Phone":
 # ---------------- Search by Month ----------------
 elif mode == "📅 Search by Month":
     st.header("📅 Search Bills for a Month")
-    selected_month = st.selectbox("Select Month", [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ])
+
+    selected_month = st.selectbox("Select Month", range(1, 13), format_func=lambda x: datetime(2023, x, 1).strftime("%B"))
     selected_year = st.selectbox("Select Year", list(range(2020, datetime.now().year + 1))[::-1])
 
     if st.button("🔍 Search"):
         results = list_all_bills_for_month(selected_month, selected_year)
         if results:
-            st.subheader(f"📋 Bills for {selected_month} {selected_year}")
+            st.subheader(f"📋 Bills for {datetime(2023, selected_month, 1).strftime('%B')} {selected_year}")
             st.table(results)
         else:
             st.info("ℹ️ No bills found for this month/year.")
