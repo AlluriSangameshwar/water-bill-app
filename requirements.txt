@@ -10,3 +10,4 @@ python-docx
 # Optional: For future Excel export (not currently used)
 pandas
 openpyxl
+streamlit-oauth
