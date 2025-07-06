@@ -71,7 +71,17 @@ def list_all_bills_from_github(month, year):
     return results
 
 # ---------------- Streamlit UI ----------------
-st.set_page_config(page_title="Water Bill App", layout="centered")
+st.set_page_config(page_title="Water Bill App", layout="centered", page_icon=None)
+# Remove default Streamlit footer and hamburger menu
+hide_streamlit_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.title("Water Bill Manager")
 
 mode = st.sidebar.radio("Select Mode", ["Add or Edit Bill", "Search by Phone", "Search by Month"])
