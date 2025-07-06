@@ -1,60 +1,71 @@
-import os
-import json
 import streamlit as st
+import requests
+import json
+import base64
 from datetime import datetime, date
-from pathlib import Path
 
 # ---------------- Configuration ----------------
-DATA_DIR = "data/bills"
-Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+GITHUB_REPO = st.secrets["GITHUB_REPO"]
+GITHUB_FOLDER = st.secrets["GITHUB_FOLDER"]
 
-# ---------------- Helper Functions ----------------
+HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
 
-def get_file_path(phone):
-    return os.path.join(DATA_DIR, f"{phone}.json")
+# ---------------- GitHub Operations ----------------
+def github_file_url(phone):
+    return f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FOLDER}/{phone}.json"
 
-def load_bill(phone):
-    path = get_file_path(phone)
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            return json.load(f)
+def fetch_bill_from_github(phone):
+    url = github_file_url(phone)
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        content = response.json()["content"]
+        return json.loads(base64.b64decode(content).decode())
     return None
 
-def save_bill(phone, customer_name, bill_to, new_bill):
-    path = get_file_path(phone)
-    data = load_bill(phone)
+def save_bill_to_github(phone, data):
+    url = github_file_url(phone)
+    content = json.dumps(data, indent=4)
+    encoded = base64.b64encode(content.encode()).decode()
 
-    if data:
-        data["customer_name"] = customer_name
-        data["bill_to"] = bill_to
-        data["bills"].append(new_bill)
-    else:
-        data = {
-            "customer_name": customer_name,
-            "bill_to": bill_to,
-            "bills": [new_bill]
-        }
+    # Check if file exists to get `sha`
+    get_resp = requests.get(url, headers=HEADERS)
+    sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
 
-    with open(path, "w") as f:
-        json.dump(data, f, indent=4)
+    payload = {
+        "message": f"Add/Update bill for {phone}",
+        "content": encoded
+    }
+    if sha:
+        payload["sha"] = sha
 
-def list_all_bills_for_month(month, year):
+    put_resp = requests.put(url, headers=HEADERS, json=payload)
+    return put_resp.status_code in [200, 201]
+
+def list_all_bills_from_github(month, year):
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FOLDER}"
+    resp = requests.get(url, headers=HEADERS)
+
     results = []
-    for file in os.listdir(DATA_DIR):
-        if file.endswith(".json"):
-            path = os.path.join(DATA_DIR, file)
-            with open(path, "r") as f:
-                data = json.load(f)
-                for bill in data.get("bills", []):
-                    ts = datetime.fromisoformat(bill["timestamp"])
-                    if ts.month == month and ts.year == year:
-                        results.append({
-                            "Phone": file.replace(".json", ""),
-                            "Name": data["customer_name"],
-                            "Address": data["bill_to"],
-                            "Amount (₹)": int(bill["amount"]),
-                            "Date": ts.strftime("%d-%m-%Y")
-                        })
+    if resp.status_code == 200:
+        for file in resp.json():
+            if file["name"].endswith(".json"):
+                bill_resp = requests.get(file["download_url"], headers=HEADERS)
+                if bill_resp.status_code == 200:
+                    try:
+                        data = json.loads(bill_resp.content.decode())
+                        for bill in data.get("bills", []):
+                            ts = datetime.fromisoformat(bill["timestamp"])
+                            if ts.month == month and ts.year == year:
+                                results.append({
+                                    "Phone": file["name"].replace(".json", ""),
+                                    "Name": data["customer_name"],
+                                    "Address": data["bill_to"],
+                                    "Amount (₹)": int(bill["amount"]),
+                                    "Date": ts.strftime("%d-%m-%Y")
+                                })
+                    except Exception:
+                        continue
     return results
 
 # ---------------- Streamlit UI ----------------
@@ -70,25 +81,32 @@ if mode == "➕ Add or Edit Bill":
     phone = st.text_input("Phone Number*", max_chars=10)
     customer_name = st.text_input("Customer Name")
     bill_to = st.text_input("Bill To (Address)")
-
-    # Allow only integer input for Amount Paid
     amount = st.number_input("Amount Paid (₹)", min_value=0, step=1, format="%d")
 
     use_custom_date = st.checkbox("📅 Select Custom Bill Date")
-    if use_custom_date:
-        selected_date = st.date_input("Choose Bill Date", value=date.today())
-        bill_datetime = datetime.combine(selected_date, datetime.now().time())
-    else:
-        bill_datetime = datetime.now()
+    bill_datetime = datetime.combine(st.date_input("Bill Date") if use_custom_date else date.today(),
+                                     datetime.now().time())
 
     if st.button("💾 Save Bill"):
         if phone and customer_name and bill_to:
-            bill = {
+            existing_data = fetch_bill_from_github(phone) or {
+                "customer_name": customer_name,
+                "bill_to": bill_to,
+                "bills": []
+            }
+
+            existing_data["customer_name"] = customer_name
+            existing_data["bill_to"] = bill_to
+            existing_data["bills"].append({
                 "amount": int(amount),
                 "timestamp": bill_datetime.isoformat()
-            }
-            save_bill(phone, customer_name, bill_to, bill)
-            st.success(f"✅ Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
+            })
+
+            success = save_bill_to_github(phone, existing_data)
+            if success:
+                st.success(f"✅ Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
+            else:
+                st.error("❌ Failed to save to GitHub.")
         else:
             st.error("❗ All fields are required!")
 
@@ -97,7 +115,7 @@ elif mode == "🔍 Search by Phone":
     st.header("🔍 Search Customer History")
     phone = st.text_input("Enter Phone Number")
     if phone:
-        data = load_bill(phone)
+        data = fetch_bill_from_github(phone)
         if data:
             st.subheader(f"Customer: {data['customer_name']}")
             st.write(f"📍 Address: {data['bill_to']}")
@@ -121,7 +139,7 @@ elif mode == "📅 Search by Month":
     selected_year = st.selectbox("Select Year", list(range(2020, datetime.now().year + 1))[::-1])
 
     if st.button("🔍 Search"):
-        results = list_all_bills_for_month(selected_month, selected_year)
+        results = list_all_bills_from_github(selected_month, selected_year)
         if results:
             st.subheader(f"📋 Bills for {datetime(2023, selected_month, 1).strftime('%B')} {selected_year}")
             st.table(results)
