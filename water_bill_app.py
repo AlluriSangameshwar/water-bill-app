@@ -3,6 +3,7 @@ import requests
 import json
 import base64
 from datetime import datetime, date
+from streamlit_oauth import OAuth2Component
 
 # ---------------- Configuration ----------------
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
@@ -10,6 +11,27 @@ GITHUB_REPO = st.secrets["GITHUB_REPO"]
 GITHUB_FOLDER = st.secrets["GITHUB_FOLDER"]
 
 HEADERS = {"Authorization": f"Bearer {GITHUB_TOKEN}"}
+
+# ---------------- Google Auth ----------------
+client_id = st.secrets["GOOGLE_CLIENT_ID"]
+client_secret = st.secrets["GOOGLE_CLIENT_SECRET"]
+redirect_uri = "https://{your-streamlit-app}.streamlit.app"
+
+oauth = OAuth2Component(client_id, client_secret, auth_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+                         token_endpoint="https://oauth2.googleapis.com/token",
+                         refresh_token_endpoint="https://oauth2.googleapis.com/token",
+                         revoke_endpoint="https://oauth2.googleapis.com/revoke",
+                         scope="email profile",
+                         redirect_uri=redirect_uri)
+
+token = oauth.authorize_button("Login with Google", "google")
+
+if not token:
+    st.stop()
+
+user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo",
+                         headers={"Authorization": f"Bearer {token['access_token']}"}).json()
+email = user_info.get("email")
 
 # ---------------- GitHub Operations ----------------
 def github_file_url(phone):
@@ -64,7 +86,8 @@ def list_all_bills_from_github(month, year):
                                     "Name": data["customer_name"],
                                     "Address": data["bill_to"],
                                     "Amount (₹)": int(bill["amount"]),
-                                    "Date": ts.strftime("%d-%m-%Y")
+                                    "Date": ts.strftime("%d-%m-%Y"),
+                                    "Saved By": bill.get("email", "")
                                 })
                     except Exception:
                         continue
@@ -78,6 +101,7 @@ hide_streamlit_style = """
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    .viewerBadge_container__1QSob {display: none !important;}
     </style>
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
@@ -110,12 +134,13 @@ if mode == "Add or Edit Bill":
             existing_data["bill_to"] = bill_to
             existing_data["bills"].append({
                 "amount": int(amount),
-                "timestamp": bill_datetime.isoformat()
+                "timestamp": bill_datetime.isoformat(),
+                "email": email
             })
 
             success = save_bill_to_github(phone, existing_data)
             if success:
-                st.success(f"Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
+                st.success(f"Bill saved for {bill_datetime.strftime('%d %B %Y')} by {email}!")
             else:
                 st.error("Failed to save to GitHub.")
                 st.code("Make sure token has repo/content access and the folder exists.")
@@ -137,6 +162,7 @@ elif mode == "Search by Phone":
                     st.markdown(f"""
                     - **Date:** {ts.strftime('%d %B %Y')}
                     - **Amount Paid:** ₹{int(bill["amount"])}
+                    - **Saved By:** {bill.get("email", "")}
                     - Timestamp: {bill["timestamp"]}
                     """)
             else:
