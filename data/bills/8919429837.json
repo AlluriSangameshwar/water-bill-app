@@ -1,0 +1,11 @@
+{
+    "customer_name": "chaitu",
+    "bill_to": "242",
+    "bills": [
+        {
+            "amount": 200,
+            "timestamp": "2025-07-06T08:36:47.978899",
+            "saved_by": "vinod"
+        }
+    ]
+}
