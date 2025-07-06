@@ -72,23 +72,23 @@ def list_all_bills_from_github(month, year):
 
 # ---------------- Streamlit UI ----------------
 st.set_page_config(page_title="Water Bill App", layout="centered")
-st.title("\ud83d\udca7 Water Bill Manager")
+st.title("Water Bill Manager")
 
-mode = st.sidebar.radio("Select Mode", ["\u2795 Add or Edit Bill", "\ud83d\udd0d Search by Phone", "\ud83d\uddd5\ufe0f Search by Month"])
+mode = st.sidebar.radio("Select Mode", ["Add or Edit Bill", "Search by Phone", "Search by Month"])
 
-if mode == "\u2795 Add or Edit Bill":
-    st.header("\u2795 Add or Edit Water Bill")
+if mode == "Add or Edit Bill":
+    st.header("Add or Edit Water Bill")
 
     phone = st.text_input("Phone Number*", max_chars=10)
     customer_name = st.text_input("Customer Name")
     bill_to = st.text_input("Bill To (Address)")
     amount = st.number_input("Amount Paid (\u20b9)", min_value=0, step=1, format="%d")
 
-    use_custom_date = st.checkbox("\ud83d\udcc5 Select Custom Bill Date")
+    use_custom_date = st.checkbox("Select Custom Bill Date")
     bill_datetime = datetime.combine(st.date_input("Bill Date") if use_custom_date else date.today(),
                                      datetime.now().time())
 
-    if st.button("\ud83d\udcbe Save Bill"):
+    if st.button("Save Bill"):
         if phone and customer_name and bill_to:
             existing_data = fetch_bill_from_github(phone) or {
                 "customer_name": customer_name,
@@ -105,43 +105,43 @@ if mode == "\u2795 Add or Edit Bill":
 
             success = save_bill_to_github(phone, existing_data)
             if success:
-                st.success(f"\u2705 Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
+                st.success(f"Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
             else:
-                st.error("\u274c Failed to save to GitHub.")
+                st.error("Failed to save to GitHub.")
                 st.code("Make sure token has repo/content access and the folder exists.")
         else:
-            st.error("\u2757 All fields are required!")
+            st.error("All fields are required!")
 
-elif mode == "\ud83d\udd0d Search by Phone":
-    st.header("\ud83d\udd0d Search Customer History")
+elif mode == "Search by Phone":
+    st.header("Search Customer History")
     phone = st.text_input("Enter Phone Number")
     if phone:
         data = fetch_bill_from_github(phone)
         if data:
             st.subheader(f"Customer: {data['customer_name']}")
-            st.write(f"\ud83d\udccd Address: {data['bill_to']}")
-            st.write("\ud83d\udcdc Bill History:")
+            st.write(f"Address: {data['bill_to']}")
+            st.write("Bill History:")
             for bill in sorted(data["bills"], key=lambda x: x["timestamp"], reverse=True):
                 ts = datetime.fromisoformat(bill["timestamp"])
                 st.markdown(f"""
                 - **Date:** {ts.strftime('%d %B %Y')}
                 - **Amount Paid:** \u20b9{int(bill["amount"])}
-                - \u23f1\ufe0f {bill["timestamp"]}
+                - Timestamp: {bill["timestamp"]}
                 """)
         else:
-            st.warning("\u274c No data found for this phone number.")
+            st.warning("No data found for this phone number.")
 
-elif mode == "\ud83d\uddd5\ufe0f Search by Month":
-    st.header("\ud83d\uddd5\ufe0f Search Bills for a Month")
+elif mode == "Search by Month":
+    st.header("Search Bills for a Month")
 
     selected_month = st.selectbox("Select Month", range(1, 13),
                                   format_func=lambda x: datetime(2023, x, 1).strftime("%B"))
     selected_year = st.selectbox("Select Year", list(range(2020, datetime.now().year + 1))[::-1])
 
-    if st.button("\ud83d\udd0d Search"):
+    if st.button("Search"):
         results = list_all_bills_from_github(selected_month, selected_year)
         if results:
-            st.subheader(f"\ud83d\udccb Bills for {datetime(2023, selected_month, 1).strftime('%B')} {selected_year}")
+            st.subheader(f"Bills for {datetime(2023, selected_month, 1).strftime('%B')} {selected_year}")
             st.table(results)
         else:
-            st.info("\u2139\ufe0f No bills found for this month/year.")
+            st.info("No bills found for this month/year.")
