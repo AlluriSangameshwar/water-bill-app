@@ -63,7 +63,7 @@ def list_all_bills_from_github(month, year):
                                     "Phone": file["name"].replace(".json", ""),
                                     "Name": data["customer_name"],
                                     "Address": data["bill_to"],
-                                    "Amount (\u20b9)": int(bill["amount"]),
+                                    "Amount (₹)": int(bill["amount"]),
                                     "Date": ts.strftime("%d-%m-%Y")
                                 })
                     except Exception:
@@ -82,7 +82,7 @@ if mode == "Add or Edit Bill":
     phone = st.text_input("Phone Number*", max_chars=10)
     customer_name = st.text_input("Customer Name")
     bill_to = st.text_input("Bill To (Address)")
-    amount = st.number_input("Amount Paid (\u20b9)", min_value=0, step=1, format="%d")
+    amount = st.number_input("Amount Paid (₹)", min_value=0, step=1, format="%d")
 
     use_custom_date = st.checkbox("Select Custom Bill Date")
     bill_datetime = datetime.combine(st.date_input("Bill Date") if use_custom_date else date.today(),
@@ -115,21 +115,22 @@ if mode == "Add or Edit Bill":
 elif mode == "Search by Phone":
     st.header("Search Customer History")
     phone = st.text_input("Enter Phone Number")
-    if phone:
-        data = fetch_bill_from_github(phone)
-        if data:
-            st.subheader(f"Customer: {data['customer_name']}")
-            st.write(f"Address: {data['bill_to']}")
-            st.write("Bill History:")
-            for bill in sorted(data["bills"], key=lambda x: x["timestamp"], reverse=True):
-                ts = datetime.fromisoformat(bill["timestamp"])
-                st.markdown(f"""
-                - **Date:** {ts.strftime('%d %B %Y')}
-                - **Amount Paid:** \u20b9{int(bill["amount"])}
-                - Timestamp: {bill["timestamp"]}
-                """)
-        else:
-            st.warning("No data found for this phone number.")
+    if st.button("Search"):
+        if phone:
+            data = fetch_bill_from_github(phone)
+            if data:
+                st.subheader(f"Customer: {data['customer_name']}")
+                st.write(f"Address: {data['bill_to']}")
+                st.write("Bill History:")
+                for bill in sorted(data["bills"], key=lambda x: x["timestamp"], reverse=True):
+                    ts = datetime.fromisoformat(bill["timestamp"])
+                    st.markdown(f"""
+                    - **Date:** {ts.strftime('%d %B %Y')}
+                    - **Amount Paid:** ₹{int(bill["amount"])}
+                    - Timestamp: {bill["timestamp"]}
+                    """)
+            else:
+                st.warning("No data found for this phone number.")
 
 elif mode == "Search by Month":
     st.header("Search Bills for a Month")
