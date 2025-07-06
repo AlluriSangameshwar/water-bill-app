@@ -84,7 +84,7 @@ hide_streamlit_style = """
 """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-st.title("Water Bill Manager")
+st.title("Shivanagar Water Bill Manager")
 
 mode = st.sidebar.radio("Select Mode", ["Add or Edit Bill", "Search by Phone", "Search by Month"])
 
