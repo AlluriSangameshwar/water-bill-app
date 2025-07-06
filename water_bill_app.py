@@ -1,7 +1,7 @@
 import os
 import json
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 # ---------------- Configuration ----------------
@@ -49,11 +49,11 @@ def list_all_bills_for_month(month, year):
                     ts = datetime.fromisoformat(bill["timestamp"])
                     if ts.month == month and ts.year == year:
                         results.append({
-                            "phone": file.replace(".json", ""),
-                            "name": data["customer_name"],
-                            "bill_to": data["bill_to"],
-                            "amount": bill["amount"],
-                            "timestamp": bill["timestamp"]
+                            "Phone": file.replace(".json", ""),
+                            "Name": data["customer_name"],
+                            "Address": data["bill_to"],
+                            "Amount (₹)": bill["amount"],
+                            "Date": ts.strftime("%d-%m-%Y")
                         })
     return results
 
@@ -72,14 +72,21 @@ if mode == "➕ Add or Edit Bill":
     bill_to = st.text_input("Bill To (Address)")
     amount = st.number_input("Amount Paid (₹)", min_value=0.0)
 
+    use_custom_date = st.checkbox("📅 Select Custom Bill Date")
+    if use_custom_date:
+        selected_date = st.date_input("Choose Bill Date", value=date.today())
+        bill_datetime = datetime.combine(selected_date, datetime.now().time())
+    else:
+        bill_datetime = datetime.now()
+
     if st.button("💾 Save Bill"):
         if phone and customer_name and bill_to:
             bill = {
                 "amount": amount,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": bill_datetime.isoformat()
             }
             save_bill(phone, customer_name, bill_to, bill)
-            st.success("✅ Bill saved successfully!")
+            st.success(f"✅ Bill saved for {bill_datetime.strftime('%d %B %Y')}!")
         else:
             st.error("❗ All fields are required!")
 
@@ -94,10 +101,10 @@ elif mode == "🔍 Search by Phone":
             st.write(f"📍 Address: {data['bill_to']}")
             st.write("📜 Bill History:")
             for bill in sorted(data["bills"], key=lambda x: x["timestamp"], reverse=True):
-                dt = datetime.fromisoformat(bill["timestamp"])
+                ts = datetime.fromisoformat(bill["timestamp"])
                 st.markdown(f"""
-                - **Date:** {dt.strftime("%d %B %Y")}
-                - **Amount:** ₹{bill["amount"]}
+                - **Date:** {ts.strftime('%d %B %Y')}
+                - **Amount Paid:** ₹{bill["amount"]}
                 - ⏱️ {bill["timestamp"]}
                 """)
         else:
@@ -107,7 +114,8 @@ elif mode == "🔍 Search by Phone":
 elif mode == "📅 Search by Month":
     st.header("📅 Search Bills for a Month")
 
-    selected_month = st.selectbox("Select Month", range(1, 13), format_func=lambda x: datetime(2023, x, 1).strftime("%B"))
+    selected_month = st.selectbox("Select Month", range(1, 13),
+                                  format_func=lambda x: datetime(2023, x, 1).strftime("%B"))
     selected_year = st.selectbox("Select Year", list(range(2020, datetime.now().year + 1))[::-1])
 
     if st.button("🔍 Search"):
