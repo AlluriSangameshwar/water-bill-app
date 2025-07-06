@@ -1,0 +1,12 @@
+# Core App
+streamlit==1.35.0
+
+# Optional: For GitHub API (to fetch/push bills as JSON)
+requests
+
+# Optional: For Word document (.docx) export
+python-docx
+
+# Optional: For future Excel export (not currently used)
+pandas
+openpyxl
