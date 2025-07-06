@@ -52,7 +52,7 @@ def list_all_bills_for_month(month, year):
                             "Phone": file.replace(".json", ""),
                             "Name": data["customer_name"],
                             "Address": data["bill_to"],
-                            "Amount (₹)": bill["amount"],
+                            "Amount (₹)": int(bill["amount"]),
                             "Date": ts.strftime("%d-%m-%Y")
                         })
     return results
@@ -70,7 +70,9 @@ if mode == "➕ Add or Edit Bill":
     phone = st.text_input("Phone Number*", max_chars=10)
     customer_name = st.text_input("Customer Name")
     bill_to = st.text_input("Bill To (Address)")
-    amount = st.number_input("Amount Paid (₹)", min_value=0.0)
+
+    # Allow only integer input for Amount Paid
+    amount = st.number_input("Amount Paid (₹)", min_value=0, step=1, format="%d")
 
     use_custom_date = st.checkbox("📅 Select Custom Bill Date")
     if use_custom_date:
@@ -82,7 +84,7 @@ if mode == "➕ Add or Edit Bill":
     if st.button("💾 Save Bill"):
         if phone and customer_name and bill_to:
             bill = {
-                "amount": amount,
+                "amount": int(amount),
                 "timestamp": bill_datetime.isoformat()
             }
             save_bill(phone, customer_name, bill_to, bill)
@@ -104,7 +106,7 @@ elif mode == "🔍 Search by Phone":
                 ts = datetime.fromisoformat(bill["timestamp"])
                 st.markdown(f"""
                 - **Date:** {ts.strftime('%d %B %Y')}
-                - **Amount Paid:** ₹{bill["amount"]}
+                - **Amount Paid:** ₹{int(bill["amount"])}
                 - ⏱️ {bill["timestamp"]}
                 """)
         else:
