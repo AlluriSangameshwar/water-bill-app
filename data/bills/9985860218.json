@@ -1,0 +1,11 @@
+{
+    "customer_name": "Samba",
+    "bill_to": "242",
+    "bills": [
+        {
+            "amount": 100,
+            "timestamp": "2025-07-06T04:59:49.441183",
+            "saved_by": "Samba"
+        }
+    ]
+}
